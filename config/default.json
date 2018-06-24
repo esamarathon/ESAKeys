@@ -1,0 +1,22 @@
+{
+	"obsConnection": {
+		"address": "localhost:4444",
+		"password": ""
+	},
+	"obsScenes": {
+		"capture1": "Game Capture 1",
+		"capture2": "Game Capture 2",
+		"capture3": "Game Capture 3",
+		"capture4": "Game Capture 4"
+	},
+	"obsSources": {
+		"rack1": "Rack 1",
+		"rack2": "Rack 2",
+		"rack3": "Rack 3",
+		"rack4": "Rack 4"
+	},
+	"emergencyMode": {
+		"scene": "Emergency Scene",
+		"audioSource": "Mic/Aux"
+	}
+}
