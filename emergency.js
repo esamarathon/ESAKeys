@@ -7,7 +7,7 @@ var emergencyDoubleCheck = false;
 var emergencyTimeout;
 
 // Listen to pressed keys.
-xkeys.on('down', keyIndex => {
+xkeys.on('downKey', keyIndex => {
 	// Disable everything if emergency mode is on.
 	if (global.emergencyMode)
 		return;

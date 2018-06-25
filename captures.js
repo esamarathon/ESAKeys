@@ -9,12 +9,7 @@ const config = require('config');
 const clone = require('clone');
 
 // Default cropping values.
-var cropZero = {
-	'top': 0,
-	'left': 0,
-	'bottom': 0,
-	'right': 0
-};
+var cropZero = {'top': 0, 'left': 0, 'bottom': 0, 'right': 0};
 
 // Initial cropping values for all captures.
 var cropCache = {
@@ -24,15 +19,14 @@ var cropCache = {
 	'capture4': clone(cropZero)
 };
 
-var capture = -1; // 0 -> ?
+// Stores data for what keys are selected and such.
+var capture = -1; // 0 -> 3 (as of now).
 var cropSide = -1; //0 top, 1 right, 2 bottom, 3 left
-var rack = {
-	0: 0,
-	1: 1,
-	2: 2,
-	3: 3
-}
+var rack = {0: 0, 1: 1, 2: 2, 3: 3}; // Key: game capture, Value: rack
 
+var captureTimeout;
+
+// Key between code value and scene name in OBS.
 var gameCaptureKey = {
 	0: config.get('obsScenes.capture1'),
 	1: config.get('obsScenes.capture2'),
@@ -40,6 +34,7 @@ var gameCaptureKey = {
 	3: config.get('obsScenes.capture4')
 };
 
+// Key between code value and source name in OBS.
 var rackKey = {
 	0: config.get('obsSources.rack1'),
 	1: config.get('obsSources.rack2'),
@@ -51,11 +46,12 @@ var rackKey = {
 // We already check this in obs.js but we need to do more on connection here.
 obs.on('ConnectionOpened', () => {
 	// Gets current cropping settings on startup from the 4 "Game Capture" scenes.
-	for (var i = 1; i < 5; i++) {
+	for (var i = 0; i < 4; i++) {
 		checkCropping(i);
 	}
 
 	// Runs a rack visibility check using the function below.
+	// 1 loop for game captures, 1 for racks
 	for (var i = 0; i < 4; i++) {
 		for (var j = 0; j < 4; j++) {
 			checkRackVisibility(i, j);
@@ -63,38 +59,41 @@ obs.on('ConnectionOpened', () => {
 	}
 });
 
+// On startup gets the current cropping values from OBS.
+// Only gets cropping from 1st rack; they should all be the same.
 function checkCropping(i) {
 	obs.send('GetSceneItemProperties', {
-		'scene-name': config.get('obsScenes.capture'+i),
-		'item': config.get('obsSources.rack1'),
+		'scene-name': gameCaptureKey[i],
+		'item': rackKey[0]
 	}, (err, data) => {
-		if (!err) {
-			cropCache['capture'+i] = data.crop;
-			console.log(data.crop, i);
-		}
+		if (!err)
+			cropCache['capture'+(i+1)] = data.crop;
 	});
 }
 
 // A bit of a sloppy/lazy way to get current rack visibility on startup from OBS.
+// Used by looping through all game captures/racks and updating the value.
+// If 2 racks are visible, this could mess things up.
 function checkRackVisibility(i, j) {
 	obs.send('GetSceneItemProperties', {
-		'scene-name': config.get('obsScenes.capture'+(i+1)),
-		'item': config.get('obsSources.rack'+(j+1)),
+		'scene-name': gameCaptureKey[i],
+		'item': rackKey[j]
 	}, (err, data) => {
 		if (!err) {
-			if (data.visible) {
+			if (data.visible)
 				rack[i] = j;
-				console.log('capture %s has rack %s visible', i, j);
-			}
 		}
 	});
 }
 
 // Listen to pressed keys.
-xkeys.on('down', keyIndex => {
+xkeys.on('downKey', keyIndex => {
+	// Disable everything if emergency mode is on.
+	if (global.emergencyMode)
+		return;
+	
 	// Keys are sent as strings.
 	keyIndex = parseInt(keyIndex);
-	//console.log(keyIndex);
 
 	// All 4 of the "Game Capture" selection keys.
 	if (keyIndex === 60 || keyIndex === 61 || keyIndex === 62 || keyIndex === 63) {
@@ -107,22 +106,34 @@ xkeys.on('down', keyIndex => {
 			xkeys.setBacklight(oldCapture+60, false, true); // Old key, Off, Red
 
 		// If this source is the same as the old one, turn it all off.
-		else if (oldCapture === capture) {
-			capture = -1;
-			cropSide = -1;
-			xkeys.setBacklight(keyIndex, false, true); // New key, Off, Red
-			turnOffRackKeys();
-			turnOffCroppingKeys();
+		else if (oldCapture === capture && oldCapture !== -1) {
+			turnOffCaptureSelection();
 		}
 		
 		// If the above options caused a source to be active, blink the rack/cropping keys.
 		if (capture >= 0) {
+			var oldCropSide = cropSide;
 			cropSide = -1;
-			blinkRackKeys();
-			blinkCroppingKeys();
+
+			// If there was no old capture, starts blinking keys.
+			if (oldCapture === -1) {
+				// Starts blinking the relevant keys.
+				blinkRackKeys(68+rack[capture]); // Ignore current rack.
+				blinkCroppingKeys();
+			}
+
+			// If not, turn off the previously selected rack/crop side.
+			else {
+				toggleRackOrCropKey(68+rack[oldCapture], false);
+				if (oldCropSide !== -1) toggleRackOrCropKey(76+oldCropSide, false);
+			}
 
 			// Set the current rack value light to be constantly on.
-			xkeys.setBacklight(68+rack[capture], true); // New key, On(, Blue)
+			toggleRackOrCropKey(68+rack[capture], true);
+
+			// Clear (if needed) and (re)setup the timeout.
+			clearTimeout(captureTimeout);
+			captureTimeout = setTimeout(turnOffCaptureSelection, 30000); // 30 seconds
 		}
 	}
 
@@ -130,34 +141,34 @@ xkeys.on('down', keyIndex => {
 	if (capture >= 0 && (keyIndex === 68 || keyIndex === 69 || keyIndex === 70 || keyIndex === 71)) {
 		var oldRack = rack[capture];
 		rack[capture] = keyIndex-68;
-		xkeys.setBacklight(keyIndex, true); // New key, On(, Blue)
+		toggleRackOrCropKey(keyIndex, true);
 		changeRack();
 		
 		// If there was an old rack and it's not the same as the current one, make the old one blink.
 		if (oldRack >= 0 && oldRack !== rack[capture])
-			xkeys.setBacklight(68+oldRack, true, false, true); // Old key, On, Blue, Blinking
+			toggleRackOrCropKey(68+oldRack, false);
 	}
 
 	// If a source is selected, we can use the keys to choose the cropping side.
 	if (capture >= 0 && (keyIndex === 76 || keyIndex === 77 || keyIndex === 78 || keyIndex === 79)) {
 		var oldCropSide = cropSide;
 		cropSide = keyIndex-76;
-		xkeys.setBacklight(keyIndex, true); // New key, On(, Blue)
+		toggleRackOrCropKey(keyIndex, true);
 		
 		// If there was an old side and it's not the same as the current one, make the old one blink.
 		if (oldCropSide >= 0 && oldCropSide !== cropSide)
-			xkeys.setBacklight(76+oldCropSide, true, false, true); // Old key, On, Blue, Blinking
+			toggleRackOrCropKey(76+oldCropSide, false);
 
 		// If the old side is the same as the current, make it blink.
 		else if (oldCropSide === cropSide) {
 			cropSide = -1;
-			xkeys.setBacklight(keyIndex, true, false, true); // New key, On, Blue, Blinking
+			toggleRackOrCropKey(keyIndex, false);
 		}
 	}
 });
 
 // Listen for keys to be lifted.
-xkeys.on('up', keyIndex => {
+xkeys.on('upKey', keyIndex => {
 	// Keys are sent as strings.
 	keyIndex = parseInt(keyIndex);
 });
@@ -235,34 +246,64 @@ function shuttleCrop() {
 
 // END
 
-// Turns on all the cropping key blue LEDs and makes them blink.
-function blinkCroppingKeys() {
-	for (var i = 76; i < 80; i++) {
-		xkeys.setBacklight(i, true, false, true);
+// Turns off the current capture selection.
+function turnOffCaptureSelection() {
+	xkeys.setBacklight(capture+60, false, true); // Capture key, Off, Red
+	capture = -1;
+	cropSide = -1;
+	turnOffRackKeys();
+	turnOffCroppingKeys();
+	clearTimeout(captureTimeout);
+}
+
+// Toggles between blinking blue and red.
+// on is true: blue -> red
+// on is false: red -> blue
+function toggleRackOrCropKey(key, on) {
+	if (on) {
+		xkeys.setBacklight(key, false, false); // Key, Off, Blue
+		xkeys.setBacklight(key, true, true); // Key, On, Red
+	}
+	else {
+		xkeys.setBacklight(key, false, true); // Key, Off, Red
+		xkeys.setBacklight(key, true, false, true); // Key, On, Blue, Blinking
 	}
 }
 
-// Turns off all the cropping key blue LEDs.
+// Turns on all the cropping key blue LEDs and makes them blink.
+function blinkCroppingKeys() {
+	for (var i = 76; i < 80; i++) {
+		xkeys.setBacklight(i, false, true); // Turn off Red
+		xkeys.setBacklight(i, true, false, true); // Turn on Blue blinking
+	}
+}
+
+// Turns off all the cropping key LEDs.
 function turnOffCroppingKeys() {
 	for (var i = 76; i < 80; i++) {
-		xkeys.setBacklight(i, false, false);
+		xkeys.setBacklight(i, false, false); // Blue
+		xkeys.setBacklight(i, false, true); // Red
 	}
 }
 
 // Turns on all the rack key blue LEDs and makes them blink.
-function blinkRackKeys() {
+function blinkRackKeys(ignore) {
 	for (var i = 68; i < 72; i++) {
-		xkeys.setBacklight(i, true, false, true);
+		if (i === ignore) continue;
+		xkeys.setBacklight(i, false, true); // Turn off Red
+		xkeys.setBacklight(i, true, false, true); // Turn on Blue blinking
 	}
 }
 
-// Turns off all the rack key blue LEDs.
+// Turns off all the rack key LEDs.
 function turnOffRackKeys() {
 	for (var i = 68; i < 72; i++) {
-		xkeys.setBacklight(i, false, false);
+		xkeys.setBacklight(i, false, false); // Blue
+		xkeys.setBacklight(i, false, true); // Red
 	}
 }
 
+// Applies cropping to all racks on the current game capture.
 function applyCropping(cropValues) {
 	for (var i = 0; i < 4; i++) {
 		// Setup options for this rack.
