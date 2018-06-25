@@ -17,7 +17,7 @@ xkeys.on('downKey', keyIndex => {
 
 	// Emergency button.
 	// Big key at the bottom left is both 7 and 15; only need to use one.
-	// Emergency mode is currently permanant, maybe need a way to clear the setting?s
+	// Emergency mode is currently permanant, maybe need a way to clear the setting?
 	if (keyIndex === 7) {
 		// We don't want the button to be active straight away, so it needs to be pressed twice.
 		if (!emergencyDoubleCheck) {

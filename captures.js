@@ -25,6 +25,8 @@ var cropSide = -1; //0 top, 1 right, 2 bottom, 3 left
 var rack = {0: 0, 1: 1, 2: 2, 3: 3}; // Key: game capture, Value: rack
 
 var captureTimeout;
+var resetAllCroppingDoubleCheck = false;
+var resetAllCroppingTimeout;
 
 // Key between code value and scene name in OBS.
 var gameCaptureKey = {
@@ -137,7 +139,7 @@ xkeys.on('downKey', keyIndex => {
 		}
 	}
 
-	// If a source is selected, we can use the keys to choose the current rack.
+	// If a capture is selected, we can use the keys to choose the current rack.
 	if (capture >= 0 && (keyIndex === 68 || keyIndex === 69 || keyIndex === 70 || keyIndex === 71)) {
 		var oldRack = rack[capture];
 		rack[capture] = keyIndex-68;
@@ -149,7 +151,7 @@ xkeys.on('downKey', keyIndex => {
 			toggleRackOrCropKey(68+oldRack, false);
 	}
 
-	// If a source is selected, we can use the keys to choose the cropping side.
+	// If a capture is selected, we can use the keys to choose the cropping side.
 	if (capture >= 0 && (keyIndex === 76 || keyIndex === 77 || keyIndex === 78 || keyIndex === 79)) {
 		var oldCropSide = cropSide;
 		cropSide = keyIndex-76;
@@ -165,12 +167,53 @@ xkeys.on('downKey', keyIndex => {
 			toggleRackOrCropKey(keyIndex, false);
 		}
 	}
+
+	// Reset cropping on current capture.
+	if (capture >= 0 && keyIndex === 75) {
+		xkeys.setBacklight(keyIndex, true, true);
+		cropCache[capture] = clone(cropZero);
+		applyCropping(capture, cropCache[capture]);
+	}
+
+	// Reset cropping on ALL captures. Does a "double check" thing so you need to press it twice.
+	if (keyIndex === 67) {
+		if (!resetAllCroppingDoubleCheck) {
+			resetAllCroppingDoubleCheck = true;
+
+			// Make the light blink red.
+			xkeys.setBacklight(67, true, true, true);
+
+			// Set timeout so we stop waiting after 10 seconds.
+			resetAllCroppingTimeout = setTimeout(() => {
+				resetAllCroppingDoubleCheck = false;
+				xkeys.setBacklight(67, false, true);
+			}, 10000);
+		}
+
+		else {
+			clearTimeout(resetAllCroppingTimeout);
+			resetAllCroppingDoubleCheck = false;
+
+			// Turn off the light.
+			xkeys.setBacklight(67, false, true);
+
+			// Reset cropping on all captures.
+			for (var i = 0; i < 4; i++) {
+				cropCache[i] = clone(cropZero);
+				applyCropping(i, cropCache[i]);
+			}
+		}
+	}
 });
 
 // Listen for keys to be lifted.
 xkeys.on('upKey', keyIndex => {
 	// Keys are sent as strings.
 	keyIndex = parseInt(keyIndex);
+
+	// Turns off "reset cropping" light if needed.
+	if (capture >= 0 && keyIndex === 75)
+		xkeys.setBacklight(keyIndex, false, true);
 });
 
 // Inside wheel, -1 left, 1 right, don't do anything on 0.
@@ -214,7 +257,7 @@ function changeCrop(value) {
 				break;
 		}
 
-		applyCropping(cropCache[capture]);
+		applyCropping(capture, cropCache[capture]);
 	}
 }
 
@@ -283,11 +326,11 @@ function turnOffRackKeys() {
 }
 
 // Applies cropping to all racks on the current game capture.
-function applyCropping(cropValues) {
+function applyCropping(cap, cropValues) {
 	for (var i = 0; i < 4; i++) {
 		// Setup options for this rack.
 		var options = {
-			'scene-name': gameCaptureKey[capture],
+			'scene-name': gameCaptureKey[cap],
 			'item': rackKey[i],
 			'crop': cropValues
 		};
