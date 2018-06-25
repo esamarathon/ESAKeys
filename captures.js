@@ -133,9 +133,7 @@ xkeys.on('downKey', keyIndex => {
 			// Set the current rack value light to be constantly on.
 			toggleRackOrCropKey(68+rack[capture], true);
 
-			// Clear (if needed) and (re)setup the timeout.
-			clearTimeout(captureTimeout);
-			captureTimeout = setTimeout(turnOffCaptureSelection, 30000); // 30 seconds
+			setupCaptureTimeout();
 		}
 	}
 
@@ -145,6 +143,7 @@ xkeys.on('downKey', keyIndex => {
 		rack[capture] = keyIndex-68;
 		toggleRackOrCropKey(keyIndex, true);
 		changeRack();
+		setupCaptureTimeout();
 		
 		// If there was an old rack and it's not the same as the current one, make the old one blink.
 		if (oldRack >= 0 && oldRack !== rack[capture])
@@ -156,6 +155,7 @@ xkeys.on('downKey', keyIndex => {
 		var oldCropSide = cropSide;
 		cropSide = keyIndex-76;
 		toggleRackOrCropKey(keyIndex, true);
+		setupCaptureTimeout();
 		
 		// If there was an old side and it's not the same as the current one, make the old one blink.
 		if (oldCropSide >= 0 && oldCropSide !== cropSide)
@@ -173,6 +173,7 @@ xkeys.on('downKey', keyIndex => {
 		xkeys.setBacklight(keyIndex, true, true);
 		cropCache[capture] = clone(cropZero);
 		applyCropping(capture, cropCache[capture]);
+		setupCaptureTimeout();
 	}
 
 	// Reset cropping on ALL captures. Does a "double check" thing so you need to press it twice.
@@ -266,6 +267,13 @@ function calculateCrop(side, pos) {
 	var amount = side + pos;
 	if (amount < 0) amount = 0;
 	return amount;
+}
+
+// This needs to be done every time a relevant button is pressed.
+function setupCaptureTimeout() {
+	// Clear (if needed) and (re)setup the timeout.
+	clearTimeout(captureTimeout);
+	captureTimeout = setTimeout(turnOffCaptureSelection, 30000); // 30 seconds
 }
 
 // Turns off the current capture selection.
