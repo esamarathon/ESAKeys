@@ -13,10 +13,10 @@ var cropZero = {'top': 0, 'left': 0, 'bottom': 0, 'right': 0};
 
 // Initial cropping values for all captures.
 var cropCache = {
-	'capture1': clone(cropZero),
-	'capture2': clone(cropZero),
-	'capture3': clone(cropZero),
-	'capture4': clone(cropZero)
+	0: clone(cropZero),
+	1: clone(cropZero),
+	2: clone(cropZero),
+	3: clone(cropZero)
 };
 
 // Stores data for what keys are selected and such.
@@ -67,7 +67,7 @@ function checkCropping(i) {
 		'item': rackKey[0]
 	}, (err, data) => {
 		if (!err)
-			cropCache['capture'+(i+1)] = data.crop;
+			cropCache[i] = data.crop;
 	});
 }
 
@@ -173,78 +173,57 @@ xkeys.on('upKey', keyIndex => {
 	keyIndex = parseInt(keyIndex);
 });
 
-// START OF UNTIDY CODE THAT NEEDS CHECKING
-
-// Inside wheel, -1 left, 1 right, don't do anything on 0 of course.
+// Inside wheel, -1 left, 1 right, don't do anything on 0.
 xkeys.on('jog', deltaPos => {
-	//console.log('Jog position has changed: '+deltaPos);
-	
-	if (cropSide >= 0 && deltaPos !== 0) {
-		switch (cropSide) {
-			case 0:
-				cropCache['capture'+(capture+1)].top = changeCrop(cropCache['capture'+(capture+1)].top, deltaPos);
-				break;
-			case 1:
-				cropCache['capture'+(capture+1)].right =changeCrop(cropCache['capture'+(capture+1)].right, deltaPos);
-				break;
-			case 2:
-				cropCache['capture'+(capture+1)].bottom = changeCrop(cropCache['capture'+(capture+1)].bottom, deltaPos);
-				break;
-			case 3:
-				cropCache['capture'+(capture+1)].left = changeCrop(cropCache['capture'+(capture+1)].left, deltaPos);
-				break;
-		}
-
-		applyCropping(cropCache['capture'+(capture+1)]);
-	}
+	// Will try to change cropping (if applicable).
+	if (cropSide >= 0)
+		changeCrop(deltaPos);
 });
 
 // Outside wheel, -7 > 0 > 7
 var oldShuttlePos = 0;
-var shuttleTO;
+var shuttleTimeout;
 xkeys.on('shuttle', shuttlePos => {
-	if (shuttlePos === 0) {
-		console.log('clearing interval')
-		clearInterval(shuttleTO);
-	}
-	else if (oldShuttlePos === 0 && shuttlePos !== 0) {
-		shuttleTO = setInterval(shuttleCrop, 100);
-		console.log('starting interval');
+	// Will try to change cropping (if applicable).
+	// Cropping with this wheel is only done every 100ms using a timeout.
+	if (cropSide >= 0) {
+		if (shuttlePos === 0)
+			clearInterval(shuttleTimeout);
+		else if (oldShuttlePos === 0 && shuttlePos !== 0)
+			shuttleTimeout = setInterval(() => {changeCrop(oldShuttlePos)}, 100);
 	}
 	
 	oldShuttlePos = shuttlePos;
 });
 
-function changeCrop(side, deltaPos) {
-	var amount = side + deltaPos;
-	if (amount < 0) amount = 0;
-	return amount;
-}
-
-function shuttleCrop() {
-	console.log('shuttle cropping')
-
-	if (cropSide >= 0 && oldShuttlePos !== 0) {
+// Used for changing the cropping from both wheels.
+function changeCrop(value) {
+	if (value !== 0) {
 		switch (cropSide) {
 			case 0:
-				cropCache['capture'+(capture+1)].top = changeCrop(cropCache['capture'+(capture+1)].top, oldShuttlePos);
+				cropCache[capture].top = calculateCrop(cropCache[capture].top, value);
 				break;
 			case 1:
-				cropCache['capture'+(capture+1)].right =changeCrop(cropCache['capture'+(capture+1)].right, oldShuttlePos);
+				cropCache[capture].right = calculateCrop(cropCache[capture].right, value);
 				break;
 			case 2:
-				cropCache['capture'+(capture+1)].bottom = changeCrop(cropCache['capture'+(capture+1)].bottom, oldShuttlePos);
+				cropCache[capture].bottom =  calculateCrop(cropCache[capture].bottom, value);
 				break;
 			case 3:
-				cropCache['capture'+(capture+1)].left = changeCrop(cropCache['capture'+(capture+1)].left, oldShuttlePos);
+				cropCache[capture].left = calculateCrop(cropCache[capture].left, value);
 				break;
 		}
 
-		applyCropping(cropCache['capture'+(capture+1)]);
-	}	
+		applyCropping(cropCache[capture]);
+	}
 }
 
-// END
+// Calculator function for above.
+function calculateCrop(side, pos) {
+	var amount = side + pos;
+	if (amount < 0) amount = 0;
+	return amount;
+}
 
 // Turns off the current capture selection.
 function turnOffCaptureSelection() {
