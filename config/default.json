@@ -7,13 +7,17 @@
 		"capture1": "Game Capture 1",
 		"capture2": "Game Capture 2",
 		"capture3": "Game Capture 3",
-		"capture4": "Game Capture 4"
+		"capture4": "Game Capture 4",
+		"camera1": "Camera Capture 1",
+		"camera2": "Camera Capture 2"
 	},
 	"obsSources": {
 		"rack1": "Rack 1",
 		"rack2": "Rack 2",
 		"rack3": "Rack 3",
-		"rack4": "Rack 4"
+		"rack4": "Rack 4",
+		"cam1": "Camera 1",
+		"cam2": "Camera 2"
 	},
 	"emergencyMode": {
 		"scene": "Emergency Scene",

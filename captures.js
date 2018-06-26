@@ -1,6 +1,3 @@
-// TODO: Clean this shit up.
-// Add a timeout for the game capture selection so they don't blink annoyingly forever
-
 const xkeys = require('./xkeys');
 const obs = require('./obs');
 const global = require('./global-vars');
@@ -103,16 +100,16 @@ xkeys.on('downKey', keyIndex => {
 		capture = keyIndex-60;
 		xkeys.setBacklight(keyIndex, true, true); // New key, On, Red
 		
-		// If an old source was active but it's different from this one, turn the old key off.
+		// If an old capture was active but it's different from this one, turn the old key off.
 		if (oldCapture >= 0 && oldCapture !== capture)
 			xkeys.setBacklight(oldCapture+60, false, true); // Old key, Off, Red
 
-		// If this source is the same as the old one, turn it all off.
+		// If this capture is the same as the old one, turn it all off.
 		else if (oldCapture === capture && oldCapture !== -1) {
 			turnOffCaptureSelection();
 		}
 		
-		// If the above options caused a source to be active, blink the rack/cropping keys.
+		// If the above options caused a capture to be active, blink the rack/cropping keys.
 		if (capture >= 0) {
 			var oldCropSide = cropSide;
 			cropSide = -1;
