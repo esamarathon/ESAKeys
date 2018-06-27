@@ -17,7 +17,8 @@
 		"rack3": "Rack 3",
 		"rack4": "Rack 4",
 		"cam1": "Camera 1",
-		"cam2": "Camera 2"
+		"cam2": "Camera 2",
+		"cam3": "Camera 3"
 	},
 	"emergencyMode": {
 		"scene": "Emergency Scene",

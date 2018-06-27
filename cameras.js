@@ -20,6 +20,7 @@ var cameraCaptureKey = {
 var cameraSourceKey = {
 	0: config.get('obsSources.cam1'),
 	1: config.get('obsSources.cam2'),
+	2: config.get('obsSources.cam3')
 };
 
 // Fired when the OBS WebSocket actually connects.
@@ -28,7 +29,7 @@ obs.on('ConnectionOpened', () => {
 	// Runs a camera visibility check using the function below.
 	// 1 loop for camera captures, 1 for camera sources
 	for (var i = 0; i < 2; i++) {
-		for (var j = 0; j < 2; j++) {
+		for (var j = 0; j < 3; j++) {
 			checkCameraVisibility(i, j);
 		}
 	}
@@ -92,7 +93,7 @@ xkeys.on('downKey', keyIndex => {
 	}
 
 	// If a capture is selected, we can use the keys to choose the current camera.
-	if (capture >= 0 && (keyIndex === 72 || keyIndex === 73)) {
+	if (capture >= 0 && (keyIndex === 72 || keyIndex === 73 || keyIndex === 74)) {
 		var oldCam = cam[capture];
 		cam[capture] = keyIndex-72;
 		toggleCameraSourceKey(keyIndex, true);
@@ -121,7 +122,7 @@ function toggleCameraSourceKey(key, on) {
 
 // Turns on all the camera source key blue LEDs and makes them blink.
 function blinkCameraSourceKeys(ignore) {
-	for (var i = 72; i < 74; i++) {
+	for (var i = 72; i < 75; i++) {
 		if (i === ignore) continue;
 		xkeys.setBacklight(i, false, true); // Turn off Red
 		xkeys.setBacklight(i, true, false, true); // Turn on Blue blinking
@@ -130,7 +131,7 @@ function blinkCameraSourceKeys(ignore) {
 
 // Turns off all the camera source key LEDs.
 function turnOffCameraSourceKeys() {
-	for (var i = 72; i < 74; i++) {
+	for (var i = 72; i < 75; i++) {
 		xkeys.setBacklight(i, false, false); // Blue
 		xkeys.setBacklight(i, false, true); // Red
 	}
@@ -154,7 +155,7 @@ function turnOffCaptureSelection() {
 // Used to change what camera source is visible on the current game capture.
 // We have to loop through all the camera sources to be able to turn off the other ones.
 function changeCameraSource() {
-	for (var i = 0; i < 2; i++) {
+	for (var i = 0; i < 3; i++) {
 		// Setup options for this camera source.
 		var options = {
 			'scene-name': cameraCaptureKey[capture],
