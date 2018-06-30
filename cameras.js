@@ -3,10 +3,20 @@ const obs = require('./obs');
 const global = require('./global-vars');
 
 const config = require('config');
+const clone = require('clone');
 
 // Stores data for what keys are selected and such.
 var capture = -1; // 0 -> 1 (as of now).
 var cam = {0: 0, 1: 1}; // Key: camera capture, Value: camera source
+
+// Default cropping values.
+var cropZero = {'top': 0, 'left': 0, 'bottom': 0, 'right': 0};
+
+// Initial cropping values for all cameras.
+var cropCache = {
+	0: clone(cropZero),
+	1: clone(cropZero)
+}; 
 
 var captureTimeout;
 
@@ -88,6 +98,7 @@ xkeys.on('downKey', keyIndex => {
 			// Set the current camera source value light to be constantly on.
 			toggleCameraSourceKey(72+cam[capture], true);
 
+			getCameraCropping(capture);
 			setupCaptureTimeout();
 		}
 	}
@@ -105,6 +116,75 @@ xkeys.on('downKey', keyIndex => {
 			toggleCameraSourceKey(72+oldCam, false);
 	}
 });
+
+// Inside wheel, -1 left, 1 right, don't do anything on 0.
+xkeys.on('jog', deltaPos => {
+	// Will try to change cropping (if applicable).
+	if (capture >= 0)
+		changeCrop(deltaPos);
+});
+
+// Outside wheel, -7 > 0 > 7
+var oldShuttlePos = 0;
+var shuttleTimeout;
+xkeys.on('shuttle', shuttlePos => {
+	// Will try to change cropping (if applicable).
+	// Cropping with this wheel is only done every 100ms using a timeout.
+	if (capture >= 0) {
+		if (shuttlePos === 0)
+			clearInterval(shuttleTimeout);
+		else if (oldShuttlePos === 0 && shuttlePos !== 0)
+			shuttleTimeout = setInterval(() => {changeCrop(oldShuttlePos)}, 100);
+	}
+	
+	oldShuttlePos = shuttlePos;
+});
+
+// Used for changing the cropping from both wheels.
+function changeCrop(value) {
+	setupCaptureTimeout();
+
+	if (value !== 0) {
+		// Top/bottom cropping.
+		if (cropCache[capture].top > 0 || cropCache[capture].bottom > 0) {
+			var croppingValues = calculateCrop(cropCache[capture].top, cropCache[capture].bottom, value);
+
+			// Apply the cropping.
+			cropCache[capture].top = croppingValues[0];
+			cropCache[capture].bottom = croppingValues[1];
+			applyCropping();
+		}
+
+		// Left/right cropping.
+		if (cropCache[capture].left > 0 || cropCache[capture].right > 0) {
+			var croppingValues = calculateCrop(cropCache[capture].left, cropCache[capture].right, value);
+
+			// Apply the cropping.
+			cropCache[capture].left = croppingValues[0];
+			cropCache[capture].right = croppingValues[1];
+			applyCropping();
+		}
+	}
+}
+
+// Calculator function for above.
+function calculateCrop(aCurrent, bCurrent, value) {
+	// Work out the cropping values.
+	var aCrop = aCurrent + value;
+	var bCrop = bCurrent - value;
+
+	// Cap the cropping values if they went negative.
+	if (aCrop < 0) {
+		bCrop += aCrop;
+		aCrop = 0;
+	}
+	else if (bCrop < 0) {
+		aCrop += bCrop;
+		bCrop = 0;
+	}
+
+	return [aCrop, bCrop];
+}
 
 // Toggles between blinking blue and red.
 // on is true: blue -> red
@@ -152,6 +232,17 @@ function turnOffCaptureSelection() {
 	clearTimeout(captureTimeout);
 }
 
+// Used to get the camera cropping from OBS.
+function getCameraCropping(i) {
+	obs.send('GetSceneItemProperties', {
+		'scene-name': config.get('obsScenes.gameLayout'),
+		'item': cameraCaptureKey[i]
+	}, (err, data) => {
+		if (!err)
+			cropCache[i] = data.crop;
+	});
+}
+
 // Used to change what camera source is visible on the current game capture.
 // We have to loop through all the camera sources to be able to turn off the other ones.
 function changeCameraSource() {
@@ -170,4 +261,17 @@ function changeCameraSource() {
 		// Send settings to OBS.
 		obs.send('SetSceneItemProperties', options);
 	}
+}
+
+// Apply crop cache to currently selected camera.
+function applyCropping() {
+	// Setup options for this rack.
+	var options = {
+		'scene-name': config.get('obsScenes.gameLayout'),
+		'item': cameraCaptureKey[capture],
+		'crop': cropCache[capture]
+	};
+
+	// Send settings to OBS.
+	obs.send('SetSceneItemProperties', options);
 }

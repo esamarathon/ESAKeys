@@ -239,6 +239,8 @@ xkeys.on('shuttle', shuttlePos => {
 
 // Used for changing the cropping from both wheels.
 function changeCrop(value) {
+	setupCaptureTimeout();
+
 	if (value !== 0) {
 		switch (cropSide) {
 			case 0:

@@ -4,6 +4,7 @@
 		"password": ""
 	},
 	"obsScenes": {
+		"gameLayout": "Game Layout",
 		"capture1": "Game Capture 1",
 		"capture2": "Game Capture 2",
 		"capture3": "Game Capture 3",
