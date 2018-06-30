@@ -6,7 +6,7 @@ const config = require('config');
 const clone = require('clone');
 
 // Default cropping values.
-var cropZero = {'top': 0, 'left': 0, 'bottom': 0, 'right': 0};
+var cropZero = {'top': 0, 'right': 0, 'bottom': 0, 'left': 0};
 
 // Initial cropping values for all captures.
 var cropCache = {

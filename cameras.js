@@ -10,7 +10,7 @@ var capture = -1; // 0 -> 1 (as of now).
 var cam = {0: 0, 1: 1}; // Key: camera capture, Value: camera source
 
 // Default cropping values.
-var cropZero = {'top': 0, 'left': 0, 'bottom': 0, 'right': 0};
+var cropZero = {'top': 0, 'right': 0, 'bottom': 0, 'left': 0};
 
 // Initial cropping values for all cameras.
 var cropCache = {
@@ -115,6 +115,30 @@ xkeys.on('downKey', keyIndex => {
 		if (oldCam >= 0 && oldCam !== cam[capture])
 			toggleCameraSourceKey(72+oldCam, false);
 	}
+
+	// Reset camera "cropping"/position back to the middle.
+	if (capture >= 0 && keyIndex === 66) {
+		xkeys.setBacklight(keyIndex, true, true);
+		
+		// Calculate the centre to the cropping.
+		var fullCropH = (cropCache[capture].left+cropCache[capture].right)/2;
+		var fullCropV = (cropCache[capture].top+cropCache[capture].bottom)/2;
+		var cropValues = {'top': fullCropV, 'right': fullCropH, 'bottom': fullCropV, 'left': fullCropH};
+
+		cropCache[capture] = clone(cropValues);
+		applyCropping();
+		setupCaptureTimeout();
+	}
+});
+
+// Listen for keys to be lifted.
+xkeys.on('upKey', keyIndex => {
+	// Keys are sent as strings.
+	keyIndex = parseInt(keyIndex);
+
+	// Turns off "reset cropping" light if needed.
+	if (capture >= 0 && keyIndex === 66)
+		xkeys.setBacklight(keyIndex, false, true);
 });
 
 // Inside wheel, -1 left, 1 right, don't do anything on 0.
